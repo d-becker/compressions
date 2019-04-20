@@ -1,89 +1,111 @@
-use std::cmp::min;
+use std::fs;
+use std::io::Read;
+use std::io::Write;
 
-mod sliding_window;
+use argparse::{ArgumentParser, Store, StoreTrue};
 
-#[derive(Debug)]
-pub struct Block {
-    pub distance: usize,
-    pub length: usize,
-    pub literal: u8,
-}
+mod bit_packer;
+mod delta;
+mod lz77;
 
-fn longest_common_prefix(left: &[u8], right: &[u8]) -> usize {
-    let mut res = 0;
-    let mut i = 0;
-
-    while let (Some(b1), Some(b2)) = (left.get(i), right.get(i)) {
-        if b1 != b2 {
-            break;
-        }
-
-        res += 1;
-        i += 1;
-    }
-
-    res
-}
-
-fn longest_match(readback_buffer: &[u8], input: &[u8]) -> (usize, usize) {
-    let range = 0..readback_buffer.len();
-    let (index, length) = range
-        .map(|i| (i, &readback_buffer[i..]))
-        .map(|(i, left)| (i, longest_common_prefix(left, input)))
-        .max_by_key(|&(_, prefix_len)| prefix_len)
-        .unwrap_or((0, 0));
-
-    let distance = if length == 0 {
-        0
-    } else {
-        readback_buffer.len() - index
-    };
-
-    (distance, length)
-}
-
-fn lz77_encode(bytes: &[u8], distance_bits: usize, length_bits: usize) -> Vec<Block> {
-    let readback_size: usize = 2usize.pow(distance_bits as u32) - 1;
-    let max_length: usize = 2usize.pow(length_bits as u32) - 1;
-
+fn read_file_to_bytes(filename: &str) -> Vec<u8> {
     let mut res = Vec::new();
 
-    let mut index = 0;
-    while index < bytes.len() {
-        let buffer_start = if index <= readback_size {
-            0
-        } else {
-            index - distance_bits
-        };
-
-        let buffer_end = min(index, buffer_start + readback_size);
-
-        let (distance, mut length) =
-            longest_match(&bytes[buffer_start..buffer_end], &bytes[index..]);
-        length = min(length, max_length);
-
-        // If we are at the end of the input, we still need a literal.
-        if index + length >= bytes.len() {
-            assert!(index + length == bytes.len());
-            length -= 1;
-        }
-
-        let literal = bytes[index + length];
-
-        res.push(Block {
-            distance,
-            length,
-            literal,
-        });
-
-        index += length + 1;
-    }
+    let mut input = fs::File::open(filename).expect("File could not be opened.");
+    input
+        .read_to_end(&mut res)
+        .expect("File could not be read.");
 
     res
 }
 
-fn main() {
-    let input = [1, 2, 3, 4, 4, 4, 5, 5, 5, 5, 5, 5];
-    let result = lz77_encode(&input, 12, 4);
-    println!("Result: {:?}", result);
+const DISTANCE_BITS: usize = 12;
+const LENGTH_BITS: usize = 4;
+
+fn main() -> std::io::Result<()> {
+    // let args: Vec<String> = std::env::args().collect();
+
+    // if args.len() < 3 {
+    //     print_usage();
+    //     std::process::exit(1);
+    // }
+
+    // let decompress = args[1] == "-d";
+    // let delta_encode = true;
+
+    // if decompress && args.len() < 4 {
+    //     print_usage();
+    //     std::process::exit(1);
+    // }
+
+    let mut decompress = false;
+    let mut delta_coding = false;
+    let mut input_name = String::new();
+    let mut output_name = String::new();
+
+    {
+        let mut parser = ArgumentParser::new();
+
+        parser.set_description(
+            "Compress or decompress a file, possibly using delta encoding (for 64-bit unsigned integers).");
+
+        parser.refer(&mut decompress).add_option(
+            &["-d", "--decompress"],
+            StoreTrue,
+            "Decompress (default is compress).",
+        );
+
+        parser.refer(&mut delta_coding).add_option(
+            &["-e", "--delta"],
+            StoreTrue,
+            "Use delta coding.",
+        );
+
+        parser
+            .refer(&mut input_name)
+            .required()
+            .add_argument("input_file", Store, "The input file name.");
+
+        parser
+            .refer(&mut output_name)
+            .required()
+            .add_argument("output_file", Store, "The output file name.");
+
+        parser.parse_args_or_exit();
+    }
+
+    let input_bytes = read_file_to_bytes(&input_name);
+
+    let res = if decompress {
+        let option = lz77::lz77_decode(&input_bytes, DISTANCE_BITS, LENGTH_BITS);
+        if let Some(result) = option {
+            if delta_coding {
+                let u64s = delta::le_bytes_to_u64s(&result);
+                let delta_decoded = delta::from_deltas(&u64s);
+                delta::u64s_to_le_bytes(&delta_decoded)
+            } else {
+                result
+            }
+        } else {
+            println!("Corrupt compressed file.");
+            std::process::exit(2);
+        }
+    } else {
+        // Compressing.
+        let to_compress = if delta_coding {
+            let u64s = delta::le_bytes_to_u64s(&input_bytes);
+            let delta_encoded = delta::to_deltas(&u64s);
+            let delta_bytes = delta::u64s_to_le_bytes(&delta_encoded);
+            delta_bytes
+        } else {
+            input_bytes
+        };
+
+        lz77::lz77_encode(&to_compress, DISTANCE_BITS, LENGTH_BITS)
+    };
+
+    let mut output = fs::File::create(output_name)?;
+    output.write_all(&res)?;
+
+    Ok(())
 }

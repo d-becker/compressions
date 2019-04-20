@@ -1,0 +1,1475 @@
+\documentclass[fontsize=11pt, appendixprefix=true]{scrreprt}
+\usepackage[magyar, english]{babel}                        % nyelvi csomag
+\usepackage[T1]{fontenc}                                   % ékezetes betűknél is legyen automatikus elválasztás
+\usepackage[utf8]{inputenc}                                % ékezetes betűk kezelése
+\usepackage{lmodern}                                       % alapértelmezett betűtípus ne legyen pixeles
+\usepackage{mathtools}                                     % képletekhez kell
+\usepackage[style=ieee, backend=biber]{biblatex}           % bibliográfia
+\usepackage{graphicx}                                      % képek beszúrása
+\graphicspath{ {./images/} }
+\usepackage[export]{adjustbox}                             % ez az ITK logó pozicionálásához kell
+\usepackage[margin=2.5cm, bindingoffset=1.25cm]{geometry}  % margók
+\usepackage[onehalfspacing]{setspace}                      % másfeles sorköz
+\usepackage[hidelinks, unicode, pdfusetitle]{hyperref}     % kattintható tartalomjegyzék és hivatkozások
+\usepackage{bookmark}                                      % PDF könyvjelzők
+\usepackage{csquotes}                                      % a bibliográfiában megfelelően legyenek formázva az idézőjelek
+\usepackage{pdfpages}
+%% \DeclareQuoteAlias{dutch}{magyar}
+
+% Kódrészletekhez ajánlom
+\usepackage{listings, scrhack}
+\usepackage{sourcecodepro} % egy jó betűtípus
+\lstset{captionpos=b, numberbychapter=false, basicstyle=\ttfamily, showstringspaces=false, columns=fullflexible, numbers=left, basicstyle=\small}
+%% \renewcommand\lstlistingname{kódrészlet}
+
+\newif\ifTDK
+\TDKfalse
+% \TDKtrue % Comment out to compile thesis.
+
+\makeatletter
+\renewcommand\fnum@lstlisting{\ifx\lst@@caption\@empty\else\thelstlisting.~\fi\lstlistingname}%
+\makeatother
+
+\titlehead{
+  \includegraphics[valign=m]{ITK_logo}
+  \parbox[c]{\textwidth}{
+    Pázmány Péter Catholic University\\
+    Faculty of Information Technology and Bionics
+  }
+}
+
+\ifTDK
+% TDK-ra: Student Research Competition, ha nincs más hivatalos.
+  \subject{Student Research Competition}
+\else
+  \subject{Thesis}
+\fi
+
+\addbibresource{bscthesis.bib}
+
+\author{Dániel Balázs Becker\\Computer Science Engineering BSc}
+\title{Abstracting Multimaterial Data Structures And Algorithms}
+\date{2018}
+\publishers{Supervisor:\\István Zoltán Reguly, PhD}
+
+% Nyilatkozathoz két parancs definíciója
+\newcommand{\pushtobottom}{\vspace*{\fill}}
+\newcommand{\signatureline}[1]{\begin{flushright}
+	\vspace*{.5cm}\par\noindent\makebox[2.5in]{\hrulefill}
+	\par\noindent\makebox[2.5in][c]{#1}
+	\end{flushright}
+}
+
+\begin{document}
+\maketitle
+
+\includepdf[pages=-]{Szakdolgozat_bejelento.pdf}
+\newpage
+
+\includepdf{Print/declaration_signed.pdf}
+
+%% \ifTDK
+%% \else
+%% \pushtobottom
+%% I, undersigned Dániel Balázs Becker, student of the Faculty of
+%% Information Technology and Bionics at Pázmány Péter Catholic University, declare
+%% that I have written this thesis solely myself, without any unauthorized
+%% help, and I have only used the sources referenced. Every part quoted word by
+%% word or in a paraphrased manner is indicated clearly, with a reference made. I
+%% have not submitted this thesis in any other training program.
+%% \signatureline{Signature}
+%% \fi
+
+\setcounter{page}{3}
+\tableofcontents
+\newpage
+\section*{Abstract}
+Computations based on a structured or unstructured mesh, with the possibility of
+accessing neighbouring elements, have wide-ranging applications in scientific
+computing. Examples include fluid dynamics simulations, simulation of cellular
+automata and the solution of partial differential equations (PDEs). As such,
+there are innumerable implementations done by scientists and programmers both
+for one-off experiments and for large software used in production. In many
+cases, the computational performance achieved by such codes is vital for
+scientific exploration, therefore many utilise modern many-core architectures
+such as multi-core CPUs or GPUs.
+
+Today's wide variety of modern many-core architectures, with their differing
+programming styles, requires considerable programming effort to run applications
+efficiently, making full use of the features and characteristics of the
+available hardware. The programmer has to consider several levels of
+parallelism; even CPUs now include wide vector units in each core, as well as
+multiple cores, and various highly parallel hardware architectures such as GPUs
+or FPGAs can be used either in addition to or instead of CPUs. The complex
+memory hierarchies that often involve several levels of cache, which may be
+explicitly programmable, present another difficulty as the programmer has to
+take cache behaviour into account in order to make the code efficient.
+
+If a certain piece of code needs to run well on multiple architectures, the
+coding effort is multiplied, and subsequently maintenance is more difficult as
+well --- any modification has to be applied to multiple codebases.
+
+In my thesis we are working on an abstraction for describing such computations
+at a high level, allowing fast experimentation and productivity. The abstraction
+is designed in such a way that it can be automatically converted to various
+high-performance implementations.
+
+A critical feature of this abstraction is an extension to support a varying
+number of materials, or species, at each grid point in the mesh, enabling much
+more complex simulations. After examining real-world multimaterial computation
+use cases, it becomes clear that devising a scheme that handles these
+computations efficiently (both in terms of memory usage and speed) is
+non-trivial. The main reason is that in most cases the vast majority of the mesh
+cells only contain one material, which opens up the possibility for using more
+economical (both in terms of memory and speed), compressed sparse data
+structures to store the data.
+
+In this work, we present the abstraction, which comes in the form of an Embedded
+Domain Specific Language (eDSL) or ``active library'', the host language being
+C++. This means that the framework can be used as if it were a traditional
+software library and can be compiled with normal compilers, but the intended
+usage for production applications is to use source-to-source compilation,
+generating code specifically to take advantage of the target hardware
+architecture. We also present examples of the most important computational
+patterns implemented in our framework, both single material and multimaterial
+cases.
+
+\newpage
+\section*{Kivonat}
+\begin{otherlanguage}{magyar}
+A strukturált és nemstrukturált térhálókon értelmezett, szomszédos elemek
+elérését lehetővé tevő számítási minták nagyon gyakoriak a tudományos célú
+számítógépes szimulációkban, többek között fluidikai szimulációk, celluláris
+automaták szimulációja és parciális differenciálegyenletek megoldása
+esetén. Ennek következtében mind kutatók, mind programozók számtalan
+implementációt készítettek az ilyen típusú számítások elvégzésére, mind egyszeri
+kísérletek céljából, mind nagyobb, tartós használatra készült programok
+részeként. A programok számítási teljesítménye nagy jelentőséggel bír a
+tudományos kutatásban való és egyéb felhasználás során, ezért sok implementáció
+használ modern, többmagos architektúrákat, például többmagos CPU-kat és GPU-kat.
+
+A ma elérhető modern, többmagos architektúrák sokfélesége jelentős programozói
+erőfeszítést tesz szükségessé, mivel a különböző hardvereket különböző módokon
+kell programozni, kiváltképp, ha a program hatékonyságának növelése érdekében az
+eszköz tulajdonságait a lehető legnagyobb mértékben ki szeretnénk használni. A
+párhuzamosságnak több szintjére kell odafigyelni: a modern CPU-k mindegyik magja
+tartalmaz vektorizációs egységeket, a processzorok több magból állnak, és a
+CPU-k helyett vagy mellett használhatunk nagyfokú párhuzamosságra képes
+eszközöket is, például GPU-kat vagy FPGA-kat. A komplex, hierarchikus
+memóriaarchitektúrák, amelyek több, akár explicite programozható cache-szintet
+tartalmaznak, egy újabb nehézséget jelentenek a programozó számára, mivel
+figyelembe kell vennie a cache sajátosságait ahhoz, hogy hatékony, a memóriát
+jól használó programot írjon.
+
+Ha egy adott kódnak többféle architektúrán kell hatékonyan futnia, a szükséges
+programozási munka mennyisége is megsokszorozódik, és ennek következtében a
+kódbázis karbantartása is sokkal nehezebbé válik, mivel minden változtatást több
+helyen is végre kell hajtani.
+
+A szakdolgozatom kapcsán egy olyan absztrakció létrehozásán dolgozunk, amivel a
+fent leírt számítási minták könnyen, magas szinten leírhatók, lehetővé téve a
+produktív, gyors kísérletezést. Az absztrakciót olyan módon terveztük meg, hogy
+lehetőség legyen belőle különböző hardverarchitektúrákra optimalizált kódot
+generálni automatikusan.
+
+Az absztrakció egyik legjelentősebb eleme, hogy a térháló minden pontjában
+egyszerre több anyag is jelen lehet, amivel sokkal komplexebb szimulációk
+futtatása válik lehetségessé. A már létező több anyagos szimulációk vizsgálata
+során egyértelművé vált, hogy egy olyan absztrakció kidolgozása, amely az ilyen
+számításokat mind memóriahasználat, mind futási sebesség szempontjából
+hatékonyan tudja elvégezni, nem triviális. Ennek oka az, hogy a legtöbb
+szimulációban a cellák túlnyomó többsége mindössze egy anyagot tartalmaz, ezért
+lehetőség nyílik a memóriahasználat és a futásidő tekintetében is gazdaságosabb,
+tömörített ritka adatstruktúrák használatára.
+
+Ezen szakdolgozatban bemutatjuk a megtervezett absztrakciót, amit egy a C++
+programozási nyelvbe beágyazott domain-specifikus nyelv (eDSL) formájában
+valósítunk meg. Ez azt jelenti, hogy a keretrendszer használható hagyományos
+szoftverkönyvtárként, és a megírt kód lefordítható hagyományos C++ fordítókkal
+is, de alapvetően a cél az egyes architektúrák sajátosságait hatékonyan
+kihasználó kód automatikus generálása minden támogatott hardverarchitektúrára.
+Az absztrakció ismertetése után bemutatjuk a legfontosabb számítási minták
+implementációját a leírt absztrakció segítségével, mind egy anyagos, mind több
+anyagos példákkal illusztrálva az keretrendszer használatának lehetőségeit.
+\end{otherlanguage}
+
+\chapter{Introduction}
+
+In computational simulations in various scientific fields, the class of problems
+that can be addressed by a model containing a spatial mesh, with data defined on
+its cells and possibly also its edges, has proven to be very useful. Examples of
+its use cases include computational fluid dynamics (CFD), computational
+electro-magnetics (CEM), the simulation of cellular automata as well as the
+solution of partial differential equations (PDEs).
+
+In this chapter, we give a description of the challenges faced by programmers or
+scientists who aim to make use of this computational model while trying to
+utilise the full potential of the vast array of modern, parallel hardware
+architectures available today. We describe how a high level abstraction can help
+to overcome these difficulties without undue compromises in performance. We also
+give an overview of existing approaches to this problem, and show in what ways
+our proposed abstraction differs from these or extends them.
+
+\section{Description of the problem}
+
+\subsection{Structured vs. unstructured meshes}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.25\textwidth]{structured_mesh}
+    \caption{Structured Cartesian grid in 3D}
+    \label{fig:structured_mesh}
+
+    \small Source: By Mysid, Slffea - Drawn in CorelDraw by Mysid, based on a %
+    JPEG by Slffea., CC BY-SA 3.0 %
+    https://commons.wikimedia.org/w/index.php?curid=1367845
+\end{figure}
+
+In the classification of mesh types, we differentiate between structured and
+unstructured meshes. The simpler of the two types is that of structured meshes
+--- the neighbourhood relations between the mesh cells are regular and are known
+from the arrangement of the data in memory. The most straightforward example is
+a rectangular (or even square) mesh in two dimensions, where the cells are
+identical rectangles or squares. If we store the data in a two dimensional
+array, the neighbours of a cell can easily be calculated by adding or
+subtracting one (or any other number in case of broader neighbourhoods) from the
+row and column indices of the cell. Structured meshes are very efficient in
+terms of memory usage and computational performance, as neighbourhood
+information is implicit in the storage pattern of the data, and no additional
+connectivity information needs to be stored or looked up. An example of a
+three-dimensional structured Cartesian grid is shown in
+\autoref{fig:structured_mesh}.
+
+Unstructured meshes, on the other hand, exhibit irregular connectivity between
+the cells. The shape of the cells is often triangular in two dimensions (and
+tetrahedral in three dimensions), though other shapes are also possible. Storing
+the data in multidimensional arrays is not convenient as information about which
+cells are adjacent needs to be stored explicitly, taking up space, and
+necessitating more expensive lookup routines than simple integer arithmetics. On
+the other hand, in settings where the solution varies across a large dynamic
+range, it is often advantageous to have different resolutions in different parts
+of the space, which can be accomplished easily with an unstructured mesh, in
+contrast to a structured one. An example of a two-dimensional unstructured mesh
+is shown in \autoref{fig:unstructured_mesh}.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.25\textwidth]{unstructured_mesh}
+    \caption{Unstructured grid in 2D}
+    \label{fig:unstructured_mesh}
+
+    \small Source: By I, Zureks, CC BY-SA 3.0, %
+    https://commons.wikimedia.org/w/index.php?curid=2358783
+\end{figure}
+
+Therefore, if the problem at hand lends itself to being modelled with structured
+meshes, a more efficient solution can be achieved if we take advantage of the
+structure. However, not all problems are easily described in terms of structured
+meshes, making it necessary to consider unstructured ones as well. In some
+cases, it may also be useful to build hybrid meshes that contain structured and
+unstructured parts, leveraging the efficiency of structured meshes where the
+geometry of the problem allows it, while using an unstructured topology where it
+is necessary.
+
+\subsection{Challenges}
+In the past decades, numerous parallel hardware architectures have emerged and
+become available for scientific research. The programming models of these are
+often inherently different. CPUs, GPUs and FPGAs have varying degrees and
+underlying physical implementations of parallelism. As an example, modern CPUs
+contain multiple cores, but in each core, they usually also have vectorisation
+units for the \textit{Single instruction, multiple data (SIMD)} type of
+parallelism. This variability implies that in order to make full use of all of
+their features and characteristics, these architectures need to be programmed in
+potentially very different ways.
+
+Another difficulty that has become relevant comparatively recently is the use of
+hierarchical cache architectures. The need for those arises because the increase
+in RAM speed has not generally been able to keep up with the pace of the
+increase in processing speed. Therefore, more and more often the bottleneck in a
+computation is not caused by the processing time but by waiting for data I/O.
+
+Hierarchical cache architectures consist of multiple layers of memory storage
+units organised such that higher-speed storage elements, which are often also
+located closer to the processing unit, have lower storage capacity than
+lower-speed elements. Main memory itself could be regarded as the last layer of
+this hierarchy (if we do not consider hard disk drives or solid state drives),
+having the highest storage capacity and the lowest speed. Efficient usage of the
+cache hierarchy is vital in many applications, as accessing data from main
+memory or from a slower cache level is potentially orders of magnitude slower
+than accessing data in a high-speed cache unit. On many architectures,
+manufacturers employ complex intelligent algorithms implemented within the
+hardware that facilitate optimal cache usage, but still, writing software in a
+cache-friendly way often has enormous impact on performance --- indeed,
+cache-friendly programming often essentially means writing software in a way
+that presents data to the processor such that its hardware cache algorithms can
+be as efficient as possible. Most of the time it means that data regions that
+are accessed close in time should be located close in memory. This is because
+when the processor reads from memory, it always reads a fixed amount of data
+even if it is more than what is immediately required. If the remaining data is
+the same as is needed by the next computation cycle, it makes it unnecessary to
+perform another (potentially very expensive) load operation from memory.
+
+Scientific computations are often run on different parallel hardware devices to
+speed up the simulations and make scientific experimentation faster. However,
+programmers and scientists face a great challenge if they, because of the
+differences in programming models and memory characteristics, have to maintain
+separate code bases for each architecture. To write efficient code for these
+devices, deep low-level knowledge of them is necessary and the scientists who
+need to use them are usually not experts on any of these architectures and
+definitely not several of them. Furthermore, maintenance of the code also
+becomes more difficult, as any change introduced has to be applied to multiple
+parts of the code base.
+
+\subsection{Goals}
+\label{Goals}
+
+The goal of my thesis research is to design and implement an abstract interface
+using which the scientific computations on spatial meshes can be expressed
+easily, at a high level, without having to consider or even know about the
+characteristics of the hardware they are to run on or the data structures that
+should be used to make the computations efficient. The abstraction is designed
+in such a way that it is possible to automatically generate efficient,
+high-performance code for multiple hardware architectures from the code written
+using the abstraction.
+
+The separation of the scientific code from the parallelisation and data
+structure code provides a solution to the problem of scientists not being
+computer experts as well as making it unnecessary to write code by hand for
+different hardware architectures and maintaining all the versions. At the same
+time, the use of code generation, together with the careful design of the
+abstraction, makes it possible to run the computations with high performance.
+
+The abstraction also frees the user from having to interact directly with the
+data structures used in the computations. One of its main advantages is that the
+data structures behind the interface can be replaced, which is important, as
+different data structures may be optimal for different computations.
+
+A critical extension to the model that is present in our abstraction in contrast
+to existing frameworks is allowing multiple materials to exist at the same
+grid point. This allows for more complex simulations and including this new
+feature is the primary motivation behind this thesis research project.
+
+\section{Active libraries and Domain Specific Languages}
+\label{eDSLs}
+
+A technique that can be used to achieve the goals described in \autoref{Goals}
+is the usage of active libraries and Domain Specific Languages (DSLs). These
+have indeed been successfully used in the past \cite{OPS, OP2}.
+
+Domain Specific Languages are computer languages that are specifically designed
+to solve problems of a particular application domain. They can be contrasted
+with general-purpose languages (GPLs), which are intended to be used on a wide
+variety of problems, with no or very few limitations. In many cases, the
+specificity of a Domain Specific Language can make it a better choice for its
+domain than a general-purpose language, as it can exploit the characteristics of
+that domain much better as it does not have the burden of having to be equally
+suitable for a huge amount of other domains as well.
+
+Domain Specific Languages can be further divided into two categories. Elements
+of the first category, \textit{standalone} domain specific languages, define
+completely new, independent languages. The second category comprises the
+languages called \textit{embedded} domain specific languages (eDSLs). These are
+embedded in a host language that is usually a general-purpose programming
+language, sharing its syntax. Therefore, many of the compilation, analysis and
+other kinds of tools of the host language can be used with the embedded language
+as well, taking the burden of developing these tools off the shoulders of the
+developers of such embedded domain specific languages.
+
+There is a great deal of variability in how much these languages modify their
+respective host languages. Some leave them completely intact, some introduce new
+keywords and others even add new language constructs.
+
+\textit{Active libraries} are programming frameworks that look like regular
+software libraries but make use of an eDSL. Their eDSL interface does not change
+the host language at all. They can often indeed be used as traditional
+libraries, compiled and linked with the standard tools of their host language,
+but their strength lies in the usage mode that involves modifying the
+compilation process and handling the embedded DSL in a special way. The DSL code
+can either be compiled directly to assembly or machine code, or more frequently
+to another programming language using source-to-source translation. This makes
+it possible to implement multiple back-ends that compile the DSL to different
+target languages and possibly different hardware architectures. This is the case
+with the two frameworks presented in \autoref{Existing_solutions}, OPS and OP2,
+and this is the goal of the framework described in this thesis as well.
+
+\section{Existing solutions}
+\label{Existing_solutions}
+
+There are multiple frameworks that address the same or similar computation
+models and challenges to the ones presented in this thesis. In this section, we
+present two such frameworks, both of which are active libraries: OPS \cite{OPS},
+which can be used for computations on structured meshes, and OP2 \cite{OP2},
+which handles unstructured meshes.
+
+These two frameworks are especially important in our case, as a long-term goal
+for our abstraction is to be compatible with these frameworks, both on
+structured and unstructured meshes, and possibly even become a part of them.
+
+Other frameworks we should mention include ExaStencils \cite{ExaStencils}, which
+is not an active library but has a similar scope to that of OPS, ExaSlang
+\cite{ExaSlang}, which can be used for multigrid algorithms and Snowflake
+\cite{Snowflake}, which is a DSL embedded in Python but also uses code
+generation. All the three frameworks are for algorithms involving neighbour
+access through stencils, on single-material meshes. Our abstraction differs from
+these in that it allows multiple materials to be present at the same grid
+point. We will elaborate on this later in this thesis.
+
+\subsection{OPS}
+
+The OPS (Oxford Parallel Library for Structured Mesh Solvers) Domain Specific
+Active Library is a framework for parallel multi-block structured mesh
+applications. Its goal is to provide a high-level abstraction for structured
+mesh computations running on different parallel hardware architectures. The
+motivation behind the framework can be summarised as follows:
+
+\begin{itemize}
+  \item separation of the domain specific, scientific code from the low-level
+    implementation details such as data structures and explicit management of
+    parallelism, thereby making it easier to use the framework
+  \item providing a common interface for various hardware architectures
+  \item extensibility and future proofing --- if a new hardware architecture
+    appears, the framework can be extended to support it, and there is no need
+    to modify the science code using the abstraction.
+\end{itemize}
+
+The framework achieves its goals by using an eDSL embedded in C/C++ and
+generating efficient, optimised code for the desired platforms. For more
+information on eDSLs, see \autoref{eDSLs}.
+
+\subsubsection{API}
+
+The OPS API consists of four components:
+
+\begin{itemize}
+  \item Blocks: a collection of structured grid blocks with dimensionality
+    defined but with no size.
+  \item Datasets: data defined on blocks, with size.
+  \item Halos: a structure describing the connections between datasets defined
+    on different blocks.
+  \item Computations: description of a calculation on the grid, accessing
+    datasets.
+\end{itemize}
+
+In order for OPS to be able to generate correct and efficient parallelised code,
+two things are of great importance. The first is the assumption that the order
+in which the elemental operations are performed on the grid points does not
+change the overall result within machine precision. This is what allows OPS to
+parallelise the computations. The second is that the data, once fed into OPS, is
+owned by OPS and can only be accessed through opaque handlers. This makes it
+possible for the framework to apply transformations to the data, which may
+further help parallelisation and efficiency as different data structures may be
+appropriate for different kinds of architectures and computations.
+
+\subsubsection{Code generation}
+
+In OPS, there are two fundamental techniques, the combination of which is used
+to produce the parallelised and optimised implementation of the
+computations. The first is \textit{code generation}, which provides the part of
+the implementation that is specific to the target hardware architecture and
+programming language. The second is \textit{back-end logic}, which contains the
+parts of the implementation that are the same for all targets, for example data
+movement among other things.
+
+Although a single threaded, conventional header file implementation is
+available, which can be compiled with a normal C/C++ compiler, the main use case
+of OPS is using actual code generation for the target platform and
+language. This makes it possible to generate specific code for the platform and
+give the target language's compiler the largest possible amount of information,
+also taking into account the characteristics of the computation at hand. The
+target compiler can then make use of the information by optimising the resulting
+machine code. Targets for OPS include single threaded applications as well as
+parallelised ones using OpenMP, OpenACC, CUDA and OpenCL.
+
+\subsubsection{Back-end logic}
+
+\textit{Back-end logic} is the collection of algorithms that are not
+hardware-specific, but common to all targets and handle the computations at a
+higher level. Examples of these include data management, distributed memory
+parallelism, data structure transformations, resilience and lazy execution
+patterns. In the following paragraphs, we give a brief presentation of some of
+these.
+
+OPS supports \textit{distributed memory parallelism} by automatically
+distributing individual blocks (or a collection of blocks) across multiple MPI
+processes. The partitioning of the data is decided upon on the basis of the
+iteration ranges on the blocks and the access patterns (stencils). The goal is
+to minimise the necessary communication between the MPI processes and balance
+the load evenly.  Data dependencies across partitions are satisfied using
+\textit{ghost cells} and automatic intra-block halo exchanges. Data from other
+partitions is sent in messages automatically on demand, the user does not have
+to request it explicitly. To keep the data consistent across the MPI processes,
+dirty bits are used.
+
+Unforeseen crashes, often due to hardware failure or power outage, can never be
+completely ruled out. Therefore, in long-running simulations, where restarting
+the simulation from the beginning in case of a crash is infeasible, it becomes
+important to backup the intermediary results during the computation. This
+resilience is provided by the \textit{checkpointing and recovery} mechanism of
+OPS, which saves the whole state space to disk periodically. Deciding the
+checkpoints in the computation, where the backups are performed, is a
+non-trivial task. Saving the whole state space to disk is an expensive process
+in terms of performance, therefore it should not be done too often, and
+preferably at times when the state space is small. Also, saving a dataset just
+before it is overwritten in a subsequent computation is wasteful. In case of a
+crash, the state space can be recovered from the backup. The computation
+fast-forwards to the checkpoint and resumes progress from there.
+
+\textit{Lazy execution} is another technique with which OPS seeks to improve its
+performance. It exploits the fact that the intermediary results in a sequence of
+computations (parallel loops) do not necessarily need to be computed at the
+point where they appear in the source code, and their evaluation can be delayed
+until the user actually accesses them, usually after a parallel loop involving
+reduction. At that time, all the computations in the sequence can be applied at
+once to each grid point, thereby only iterating through the mesh once, saving
+the cost of the remaining iterations. Lazy execution can also eliminate the
+computation of intermediate results that are never actually used in later
+computations.
+
+\subsubsection{Optimisations}
+
+Lazy execution, mostly through the fusion of sequences of parallel loops,
+enables further optimisations, some of which are described in this section.
+
+OPS uses on-demand MPI messaging, which means that data is only sent to other
+MPI processes when it is needed. However, message latency can become a
+bottleneck in many applications, therefore different optimisation strategies can
+be used to mitigate the problem. In many cases, the analysis of a sequence of
+parallel loops made available by lazy execution makes it possible to aggregate
+messages and send them at the same time, thereby reducing latency. Another
+strategy is to run an unrelated computation in parallel with messaging, hiding
+the latency of the latter. A third strategy useful in combination with the first
+two is reordering parallel loops that do not have data dependencies on each
+other in order to be able to better exploit the first two strategies.
+
+These strategies help reduce latency, but the amount of data that needs to be
+sent is not changed by them. Reduction in data exchange can be achieved by
+various communication avoidance techniques, often involving redundant
+computations and eliminating the evaluation of intermediary results that are not
+needed later in the process.
+
+A form of communication avoidance, \textit{cache blocking} or \textit{tiling}
+aims to minimise data exchange between main memory and the cache. Accessing data
+in main memory can be significantly more expensive than accessing data in cache,
+and if data often needs to be moved into and out of the cache, it can have a
+huge impact on the performance of the application. Executing a sequence of
+parallel loops on the same dataset, if applied as it written in the source code,
+executing an entire loop over the whole dataset before moving on to the next
+one, may result in repeatedly evicting the cache and moving in new data if the
+dataset does not fit in the cache. \textit{Tiling} avoids it by partitioning the
+dataset into smaller blocks or tiles and executing the whole sequence of
+parallel loops on one block at a time. This way, the same data can be reused and
+read from cache every time a parallel loop is run on the block. As OPS uses lazy
+execution and has a large amount of run-time information available such as
+iteration ranges and access patterns, discovering data dependencies, and
+consequently, partitioning the datasets into blocks, becomes much easier.
+
+\subsection{OP2}
+
+OP2 is an active library framework that essentially solves the same problems for
+unstructured meshes as does OPS for structured meshes --- the solution of
+partial differential equations (PDEs), computational electro-magnetics (CEM) and
+computational fluid dynamics (CFD), among others. The means by which the two
+frameworks operate are also the same as OP2, just like OPS, uses the concept of
+Embedded Domain Specific Languages (eDSLs) to provide a way to generate
+efficient parallelised code for different hardware architectures. The OP2 API
+comes in two forms, both of which are eDSLs --- one of them is embedded in
+C/C++, the other in Fortran.
+
+\subsubsection{API}
+
+The OP2 API consists of four main building blocks:
+
+\begin{itemize}
+  \item sets
+  \item data on sets
+  \item connectivity
+  \item operations over sets
+\end{itemize}
+
+The elements of the most common types of sets are edges and (triangular or
+quadrilateral) faces, though other types are also allowed. Data defined on sets
+may include coordinates and edge weight among other things. As the mesh that the
+set elements constitute parts of is unstructured, it is necessary to explicitly
+define the connections between the elements of different sets --- which elements
+of a set are adjacent to which elements of other sets. This is done by the
+connectivity objects, which are also called mappings.
+
+Operations over the sets are parallel loops that iterate over the elements of
+one set, possibly accessing (reading, writing or both) the elements of other
+sets through the mappings. If a loop accesses elements of other sets through the
+mappings, it is called an indirect loop, otherwise it is referred to as a direct
+loop.
+
+The code written using the OP2 abstraction is analysed by the OP2
+source-to-source compiler, which generates efficient parallelised source code
+for the target platform. This can then be compiled with traditional compilers
+and linked against the platform specific OP2 back-end. The design of the OP2
+interface allows the source-to-source compiler to apply optimisations that rely
+on information that would be very difficult or even impossible to infer had the
+code been written in the form of normal, sequential loops.
+
+As is the case with OPS, the OP2 framework also requires that the order in which
+the operations are applied to the mesh elements should not affect the final
+result within machine precision. This restriction is vital in order to allow OP2
+to achieve the greatest possible amount of parallelism, thereby significantly
+improving performance. Although this strategy comes at the price of giving up
+bitwise reproducibility, in the vast majority of applications the gains in
+performance far outweigh the negative effects, which, if needed, can be
+mitigated by other means such as increasing the floating-point precision of the
+calculations.
+
+Another limitation of the framework is that OP2 does not support double
+indirection along the mappings, i.e. starting from an element, accessing a
+connecting element in another set through a mapping and then, from that element,
+accessing yet another element through a different mapping of its own. In
+addition, the mappings are static and cannot change once defined.
+
+The targets supported by OP2 for code generation include single-threaded CPUs,
+single SMP systems based on multi-core CPUs using OpenMP, single NVIDIA GPUs
+using CUDA, clusters of CPUs using MPI and clusters of GPUs using MPI and CUDA.
+
+\subsubsection{Parallelisation strategy}
+
+In OP2, parallelisation is done on two levels. The first is distributed memory
+parallelisation on a cluster containing several nodes, while the second is
+parallelisation on a single node with shared memory architecture.
+
+Parallelisation on the cluster level consists of partitioning the domain and
+assigning every partition to a compute node. Import and export halos need to be
+defined on the boundaries of the partitions to make data from other partitions
+available to the compute nodes if they need it. As the size of these halos
+determines the size of the MPI messages that need to be sent between the nodes,
+the partitions should be chosen in such a way as to minimise the size of the
+halos. In a distributed system, to an even greater extent than on a single node,
+data movement (in the form of message passing) is often the most important
+performance bottleneck, therefore the partitioning scheme plays a significant
+role in making OP2 efficient.
+
+Single-node parallelisation is dependent on the target hardware
+architecture. CPUs provide multi-core shared-memory parallelism, and in addition
+to that, vector units in each core. On GPUs, one can use multiple thread blocks,
+each of which has multiple threads. Data movement between the main memory and
+the CPU cores, or the main graphics memory and the GPU cores is very expensive
+in terms of performance, thus the amount of data movement should be reduced as
+much as possible, and OP2 uses various techniques to achieve this.
+
+On the cluster level, partitioning the domain can be a very expensive operation,
+so it is usually only done once, and all stages of the computation are executed
+with the same partitions. On the other hand, on the single-node level, dividing
+the data between the individual CPU or GPU threads can be done for every stage
+of the computation, because between the stages, data is always located in main
+memory, and repartitioning does not necessitate additional data movement.
+
+\subsubsection{Data dependencies}
+
+Parallelisation brings with itself the possibility of race conditions, which
+must be avoided by the proper handling of data dependencies. An example of this
+is a parallel loop over edges in which two different edges attempt to increment
+the same cell (indirectly accessed through a mapping) at the same time. The two
+levels of parallelisation, distributed memory parallelisation and shared memory
+parallelisation, call for different solutions to the problem of data
+dependencies.
+
+On the level of distributed memory parallelisation, each set element (cell or
+edge) belongs to a partition owned by an MPI process. Data dependencies between
+different partitions are handled using the ``owner compute'' model, in which
+each MPI process only updates the elements that are in its own partition. In the
+case of an edge updating two cells in two different partitions, the edge
+calculation is performed in both MPI processes. This introduces redundant
+computations, but if the partitions are large enough, the proportion of
+redundant computations becomes sufficiently small to be acceptable.
+
+When a computation on a set element needs to access data from a neighbouring
+partition, MPI message passing is used to provide the data. The set elements can
+be divided into two categories: core elements do not need data from any other
+partition and can be computed without message passing, while elements in halos
+require that. This makes it possible to carry out the computations on the core
+elements in parallel to performing the MPI messaging concerning the halo
+elements. Halo elements can be further divided into elements on which redundant
+computations will be performed and elements that will only be read by
+computations in another partition.
+
+On the level of a single node, the ``owner compute'' model would be inefficient
+as the proportion of redundant computations would be significantly higher,
+presenting an unacceptable overhead. For example, on the GPU, mini-partitions (a
+part of the mesh that is handled by a single thread block) are too small and
+their halos would be two large, resulting in an increased number of redundant
+calculations. The same problem arises within a mini-partition when two threads
+attempt to update the same element simultaniously. OP2's solution is the
+``colouring'' approach in which each mini-partition (or each edge within a
+single mini-partition) is assigned a colour such that no two mini-partitions or
+edges of the same colour modify the same cell. This way, computations on
+mini-partitions and edges of the same colour can be performed in parallel. The
+colouring approach can also be used on multi-core CPUs with some modifications.
+
+\subsection{Evaluation}
+
+The two existing solutions presented above share most of their characteristics
+with each other, and also with the abstraction presented in this thesis. Their
+goal is to separate the scientific code from the implementation of parallelism
+and data structures, provide a common interface for different hardware
+architectures and make it easy to integrate new ones in the future. The
+solutions they use to achieve their goals are also essentially the same. Both of
+them employ one or more Embedded Domain Specific Languages (eDSLs) to provide an
+interface that looks familiar to programmers of their respective host languages,
+but use code generation to implement the highly specialised back-end logic that
+ensures that the resulting code can utilise the full potential of the hardware
+it is run on. Their differences lie in the class of problems they can be used to
+solve, namely OPS can handle structured meshes while OP2 works on unstructured
+meshes.
+
+Our abstraction differs from OPS and OP2 in that it allows defining a varying
+number of values on each grid point, independent of the other grid points. This
+opens up the possibility of integrating new kinds of algorithms that are useful
+in both science and industry \cite{Explosive}, \cite{Pultrusion},
+\cite{Multimat_Lagrangian}.
+
+Allowing multimaterial computations introduces some new challenges that are not
+present in the case of OPS and OP2, as will be discussed later in this
+thesis. Currently the abstraction only supports structured meshes, but we are
+planning to extend it to include unstructured meshes as well. Our abstraction
+aims to provide a high-level eDSL interface embedded in modern C++ that allows
+the user to be productive using the framework, while at the same time providing
+enough information to the code generation unit so that it can generate efficient
+and optimised code.
+
+\chapter{Methods}
+
+This chapter gives an overview of the methods and tools that were used in
+designing the interface of our abstraction.
+
+Similarly to the existing frameworks that were discussed in
+\autoref{Existing_solutions}, OPS and OP2, we use the active library approach
+for our abstraction. This provides a way to decouple the description of the
+science problem from the implementation, which is planned to be code generation
+(source-to-source compilation) for different hardware architectures and
+platforms.
+
+First we will present the challenges concerning the use of data structures
+raised by allowing a variable number of data points to be associated with each
+grid point. Afterwards, we will give some background information on the one of
+the features, namely templates, of the host language of our eDSL, C++, that make
+it possible to embed the our domain specific language in it.
+
+\section{Data structures}
+
+As we have stated before, computations on structured and unstructured meshes are
+often used patterns in various scientific fields. One of them is computational
+physics, where the grid points store information about materials that are
+located at the grid points. Although in general the computations need not
+concern materials at all, in the remaining parts of this thesis, we will use
+that term for convenience.
+
+The key extension in our abstraction in comparison to existing frameworks is
+that it allows a varying number of materials to be present in each cell of the
+mesh. The number of materials in one cell is independent of the number of
+materials in the other cells. Although there are existing multimaterial codes,
+the science code in them is intermixed with the handling of data structures and
+parallelism. To our knowledge, there is no abstract, high-level framework
+separating the domain specific code from the implementation details that also
+supports multimaterial computations.
+
+In single-material computations defined on a structured mesh, the most
+straightforward way to store the data is using a possibly multidimensional array
+where the array elements correspond to the cells in the mesh. This is a compact
+representation that is also beneficial for cache locality. In the case of
+multimaterial computations where the cells contain at most \textit{M} materials,
+it would be natural to add another dimension to the array, of size \textit{M},
+and store the material data in it. This is easy to implement as it requires only
+a few changes to the existing code. Accessing the stored values is easy as only
+simple pointer arithmetics is needed. This data representation is often called
+full-matrix representation.
+
+However, if we examine the distribution of materials in real-world scientific
+simulations, it turns out that the vast majority of the cells only contain one
+material, and those cells that contain multiple materials contain only a few of
+them, usually two or three, in most cases.
+
+In the light of this, the problems of full-matrix representation become
+apparent. On the one hand, it wastes memory space --- if there are \textit{N}
+cells altogether (in all dimensions) and at most \textit{M} materials in any
+cell, then a dataset on the mesh with full-matrix representation requires $N
+\times M \times d$ bytes, where \textit{d} is the number of bytes that is needed
+to store a dataset element. But as most cells only contain one material, the
+real amount of storage needed for the dataset is better expressed by the formula
+$(1 + \epsilon) \times N \times d$, where $\epsilon$ is a small number that can
+be calculated by summing the number of all ``extra'' materials, that is,
+materials that are not the first in their cell, and dividing this number by the
+number of cells in the mesh. As the majority of the cells contain only one
+material, $\epsilon$ will be close to zero and the amount of space needed by the
+dataset will be closer to $N \times d$ than to $N \times M \times d$.
+
+On the other hand, in case of using full-matrix representation, because of the
+large number of empty array elements, also the cache locality of the data that
+actually stores information deteriorates. This can be a huge performance hit on
+modern hardware with hierarchical cache architectures, as accessing data from
+main memory can be orders of magnitude more expensive than accessing data
+residing in the cache.
+
+A third problem is the performance loss experienced when iterating through the
+cells and materials of the dataset, caused by the need to check at every
+cell-material pair if the cell really contains the material or if the array
+element for the cell-material pair is an ``empty'' element.
+
+This calls for a more compact representation of multi-material datasets defined
+on the mesh, one that, for each cell, only uses memory for materials that are
+actually present in the cell. A number of such data representation techniques
+are presented in \cite{osti_1341844}, one of which is described here.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{mixed_mat_arrays}
+    \caption{Cell-centric compact data structure.}
+    \label{fig:mixed_mat_arrays}
+
+    \small Source: \cite{osti_1341844}
+\end{figure}
+
+The data structure consists of two parts. One of them is an array that is stored
+together with the mesh, where for each mesh cell, the array contains a slot with
+the following two fields:
+
+\begin{itemize}
+  \item \textit{nmats} --- Information about the number of materials in the
+    cell. For single-material cells, the value is -1, and for multimaterial
+    cells the value is the number of materials in the cell.
+  \item \textit{imats} --- For single-material cells, the value of this field is
+    a negative number. Taking the absolute value of this number gives the id
+    number of the material in the cell. For multimaterial cells, the value is an
+    index into an array that constitutes the second part of the data
+    structure, which we call the \textit{linked list array}.
+\end{itemize}
+
+The \textit{linked list array} is a linked list backed by a one-dimensional
+(flat) contiguous array, also stored together with the mesh. It stores
+information about the materials in multimaterial cells. To every material in
+each multimaterial cell corresponds a slot in the \textit{linked list
+  array}. The slots have the following fields:
+
+\begin{itemize}
+  \item \textit{frac2cell} --- The id number of the cell this slot belongs
+    to.
+  \item \textit{material} --- The id number of the material this slot belongs
+    to.
+  \item \textit{nextfrac} --- The index in the \textit{linked list array} of the
+    next slot that corresponds to the same cell as this slot. If there is no
+    such slot, the value is -1. This field takes the role of pointers in
+    traditional heap-based linked lists. By using a linked data structure
+    instead of a plain array where materials in the same cell simply follow each
+    other, we can later add or remove materials in the cells without having to
+    move the slots that are located to the right of the slot being added or
+    removed. However, the price we have to pay for this flexibility is the need
+    for extra processing because of the added level of indirection as well as
+    the possible decrease in data locality if the array becomes fragmented, in
+    which case it may be worth reallocating it. Depending on the application, it
+    may or may not be desirable to make this compromise, and plain array-based
+    implementations instead of the linked one presented here may perform better
+    many cases.
+\end{itemize}
+
+A visualisation of the data structure is shown in
+\autoref{fig:mixed_mat_arrays}.
+
+The values belonging to the datasets defined on the mesh are stored in two
+arrays for each dataset. These arrays run parallel to the two parts of the data
+structure mentioned above. The first array contains one element for every
+cell. For single-material cells, the elements store the values corresponding to
+the only material of the cell. For multimaterial cells, the array elements are
+undefined.
+
+The dataset values for multimaterial cells are stored in the other array, which
+runs parallel to the \textit{linked list array}. If a slot in the linked list
+array has index \textit{i}, the value corresponding to it in the parallel
+dataset array is also at index \textit{i}.
+
+This data structure is called \textit{cell-centric compact data structure} in
+the referenced article. It is because in the data structure, the cell-material
+pairs are first grouped by the cells. The opposite is also possible, and the
+referenced article does indeed present a \textit{material-centric compact data
+  structure}. It depends on the nature of the computation which one provides
+better performance.
+
+\section{C++ templates}
+
+Besides the support for object oriented programming, templates are probably the
+most important extension that C++ has added to its predecessor, the C
+language. This section gives a very brief description of some of their use
+cases, but does not aim to give a comprehensive overview of them.
+
+Templates were introduced in order to provide a way to write generic code and
+reduce code duplication. Templates exhibit a typical example of parametric
+polymorphism. Templates come in a number of varieties: function templates and
+class templates are the most frequently used, but later versions of the C++
+standard have introduced template aliases and variable templates as well.
+
+A templated entity can have a number of template parameters. Template parameters
+can be of three types:
+
+\begin{itemize}
+  \item type template parameters --- The parameter stands for a type. An example
+    of a function template with a type template parameter is shown below.
+
+    \begin{lstlisting}[language=c++]
+      template<class T>
+      T add_one(T t) {
+          return t + 1;
+      }
+    \end{lstlisting}
+  
+  \item non-type template parameters --- The template parameter is a constant
+    value of an integral or pointer type. The following example demonstrates the
+    usage of non-type template parameters in a class template representing
+    mathematical vectors.
+
+    \begin{lstlisting}[language=c++]
+      template<std::size_t N>
+      class Vector {
+          ...
+
+          private:
+              double data[N];
+      }
+    \end{lstlisting}
+
+  \item template template parameters --- The parameters are templates
+    themselves. This is a rarely used feature of C++, which can be used to model
+    higher-kinded types. An example of a function template with one template
+    template parameter and one type template parameter is given below.
+
+    \begin{lstlisting}[language=c++]
+      template< template<typename> class Container, class T >
+      void process_container(const Container<T>& container) {
+          ...
+      }
+    \end{lstlisting}
+\end{itemize}
+
+In addition to argument types and values, templates can be generic over the
+number of function arguments as well. This can be achieved by using variadic
+templates, available since C++11 using parameter packs. The following example
+illustrates the usage of variadic templates. The function template
+\texttt{compute} can take any number of arguments of any type, as long as the
+types have a member function called \texttt{some\_function} that takes an empty
+parameter list. The member function will be called on all of the arguments.
+
+\begin{lstlisting}[language=c++]
+  template<typename ...ARGS>
+  void compute(ARGS ...args) {
+	args.some_function()...;	
+  }
+\end{lstlisting}
+
+The implementation of templates uses the technique called monomorphisation. When
+needed, the compiler generates the concrete versions of the templated entities,
+substituting the concrete types or values for the template
+parameters. Therefore, every use of a template with different template arguments
+compiles to a different concrete class or function. This is in contrast to how
+generics are handled for example in Java, which uses type erasure, where there
+is only one concrete instantiation of a generic function or class after
+compilation. The advantages of monomorphisation over type erasure are better
+performance and the preservation of type information, while its disadvantage is
+the increased size of the resulting executable, which in some cases can also
+result in performance degradation if the code does not fit into the instruction
+cache because of its increased size.
+
+Though it was not the intention at the time of their design, C++ templates are
+Turing-complete. The template sublanguage of C++ constitutes a purely functional
+language that supports, among other things, recursion and branching, the latter
+of which can for example be implemented by partial template specialisation.
+Template metaprogramming can be used for compile-time code execution.
+
+\chapter{Presentation of the work}
+
+In this chapter, we will first give a description of the abstraction we have
+designed, then present the proof-of-concept C++ implementation which serves as a
+starting point for further development and code generation. Finally, we will
+show some examples of algorithms and computational patterns that our abstraction
+can be used to implement.
+
+In this chapter, we draw heavily from our article published in the proceedings
+of \textit{The 16th International Workshop on Cellular Nanoscale Networks and
+  their Applications}, 2018\cite{MM}.
+
+\section{The abstraction}
+
+In its present state, our abstraction only supports structured meshes.
+Therefore, the main component of the abstraction is an N dimensional rectangular
+mesh.  The mesh is divided into cells, each of which corresponds to a portion of
+a possibly multidimensional physical space. Each cell may contain at most
+\textit{M} materials --- the main point of the abstraction is that \textit{M}
+can be any positive integer, not only the number \textit{one}, as in existing
+frameworks. After defining the mesh and specifying how many and which materials
+each cell contains, we can associate data with the mesh, most commonly to store
+\textit{state variables}.
+
+All datasets associated with the mesh have one of the following types:
+
+\begin{itemize}
+\item CellData --- defined by cell, for example the volume of each cell. The
+  dimensionality of the dataset will be the same as the dimensionality of the
+  mesh.
+\item MatData --- defined by material, for example the thermal capacity of each
+  material, invariant of cells.
+\item CellMatData --- defined by cell and material, for example the fractional
+  volume of each material in each cell. The dimensionality of this dataset will
+  be one higher than that of the mesh, as we can store values for each material
+  in each cell.
+\item In addition, it is possible to use datasets that are neither defined by
+  cell nor by material in the computations. These are not actually associated
+  with the mesh. They can come in two forms: they are either scalars or
+  one-dimensional arrays.
+\end{itemize}
+
+The most important part of the code written using our abstraction will describe
+the algorithm executed on the mesh. In our framework, an algorithm is a sequence
+of parallel loops over the mesh, reading values from the mesh cells, potentially
+also accessing values in neighbouring cells using a stencil that has to be
+defined along with the algorithm, and also writing values at the given cell.
+
+The dimensionality of the parallel loop is always defined by the dimensionality
+of the dataset that is being written --- for read-only access, it is also
+possible to access lower dimensional datasets, for example material data in a
+cell-material loop. Reductions along either the material dimension or all
+spatial dimensions are also supported, and support for reductions along
+individual spatial dimensions may be added in the future.
+
+The interface that our proposed abstraction provides to manipulate the data is
+described below:
+
+When defining a computation, first it needs to be specified which part of the
+spatial mesh the computation will be performed on. This is called the iteration
+space. This may be the entire mesh or any N dimensional rectangular subregion of
+it. An example where restricting the iteration space to a subregion of the mesh
+can be useful is the handling of boundary conditions in case neighbour access is
+also needed to calculate the output value of a cell. Limiting the iteration
+space to an appropriate subregion of the mesh guarantees that such neighbours
+always exist.
+
+Furthermore, each computation can take any number of datasets as parameters.
+Every parameter has one of the following seven types:
+
+\begin{itemize}
+  \item IN --- This parameter type provides read-only access to the underlying
+    dataset. It is not possible to mutate the dataset if it is accessed through
+    this parameter type.
+  \item OUT --- The OUT parameter type can be used to write out the result of
+    the computation to the underlying dataset, at any grid point.
+  \item REDUCE --- This parameter type can only be used with datasets that are
+    either defined only by cell or only by material, or neither (for reduction
+    to a scalar).  The underlying dataset is used to store the result of a
+    reduction operation on a full-rank matrix (defined by both cell and
+    material) either along the material dimension or all spatial
+    dimensions. Reductions along individual spatial dimensions may be supported
+    in the future. An aggregation function has to be provided along with the
+    dataset. The reduction operation will use this function to aggregate the
+    individual data values. The aggregation function must be a binary,
+    commutative and associative function, the most straightforward examples
+    being summation and multiplication.
+  \item NEIGH --- This parameter type provides read-only access to a
+    neighbourhood of the actual cell in the underlying dataset. A stencil, in
+    the form of relative offsets of the neighbours to be used, needs to be
+    specified along with the dataset to define the access pattern.
+  \item INDEX --- Parameters of this type provide access to the spatial
+    coordinates of the cells.  They can be used in implementing complex boundary
+    conditions, where modifying the interaction space is not enough.  These
+    parameters do not have an underlying dataset. They make the multidimensional
+    index available in the \textit{user kernel} (which will be explained later)
+    in the form of an array of integers.
+  \item FREE\_SCALAR --- This parameter type provides read-only access to scalar
+    values that are not associated with the mesh.
+  \item FREE\_ARRAY --- This parameter type provides read-only access to
+    one-dimensional arrays that are not associated with the mesh.
+\end{itemize}
+
+It is allowed to take a dataset both as an IN and an OUT parameter, but the
+effect of modifying the elements in the dataset through the OUT parameter will
+not be visible when reading them through the IN parameter. To avoid making
+parallelisation much more difficult, it is forbidden to take the same dataset
+both as NEIGH and OUT.
+
+The datasets that will be used need to be passed as arguments to the
+computation, with the one of the above mentioned parameter types each. We will
+call these \textit{dataset parameters}. Afterwards, the user defines an
+operation to perform on them, which constitutes the algorithm itself.
+
+This is done locally --- the user only needs to write the part of the code that
+will be applied to every pair of a cell and a material where the cell contains
+the material. This means that they do not need to explicitly write a loop, they
+only write what would be in the innermost loop body. Also, indices are not
+needed to access the elements of the dataset arrays. All the user is required to
+do is provide a function, which we call a \textit{user kernel} or \textit{kernel
+  function}, that takes a parameter for every \textit{dataset parameter} that
+was passed to the computation. In the case of IN and OUT parameters, the
+parameters of the \textit{user kernel} are scalar values or references obtained
+by indexing the dataset with the given cell and material indices (in the case of
+datasets defined only by cell or only by material, the other index is
+ignored). For REDUCE \textit{dataset parameters}, a special wrapper type is used
+as the corresponding \textit{kernel function} parameter to take care of the
+aggregation. Similarly, the \textit{user kernel} parameter corresponding to a
+NEIGH \textit{dataset parameter} is a wrapper type providing access to the data
+defined on the neighbouring mesh cells in the underlying dataset of the NEIGH
+parameter. The \textit{kernel function} parameter corresponding to INDEX
+\textit{dataset parameters} is simply an N dimensional index type.
+
+To match the \textit{dataset parameters} to the \textit{user kernel} parameters,
+the order of the \textit{user kernel} parameters needs to be the same as the
+order of the corresponding \textit{dataset parameters}.
+
+\section{C++ implementation}
+
+Our abstraction is designed to pave the way for relatively easy and
+straightforward parallelisation through code generation. Nevertheless, the first
+step in the realisation of the framework was a pure C++ proof-of-concept
+implementation. This is a non-parallel single-threaded codebase, that instead of
+explicit code generation uses template metaprogramming, although that can be
+seen as and is indeed a form of code generation built into the C++ language
+standard.
+
+We have not made any attempts to make this implementation efficient in terms of
+run-time performance or memory footprint. The motivation behind it is solely to
+act as a proof of concept, facilitating experimentation with the abstraction and
+with the data structures used behind the scenes during the computations, for
+example to obtain preliminary measurements about the differences in speed
+between the full-matrix and the compressed data representation.
+
+This way, when the implementation of the code generation mechanism is finished,
+our framework will be a full active library, integrating all of the advantages
+of the concept.
+
+\section{Algorithms}
+
+In this section, we will show a couple of representative examples of using the
+proposed API. The first example defines a two-dimensional mesh containing $128
+\times 128$ cells, each containing only one ``material''. A nine-point edge
+filter is applied on the grid using the user-defined stencil. To handle boundary
+conditions, the iteration space is restricted to the inner $127 \times 127$
+region of the mesh in order to ensure that all the required neighbours of all
+the cells within the iteration space exist.
+
+\begin{lstlisting}[language=c++]
+const std::size_t COLS = 128;
+const std::size_t ROWS = 128;
+
+// Each cell contains the ``material'' with id 0.
+const std::vector<std::vector<std::size_t>> materials(COLS * ROWS, 0);
+
+Data<2> data({COLS, ROWS}, materials);
+
+CellData<2> x = data.new_cell_data();
+CellData<2> y = data.new_cell_data();
+
+Stencil<2> s9pt({
+  {1,1},  {1,0},  {1,-1},
+  {0,1},  {0,0},  {0,-1},
+  {-1,1}, {-1,0}, {-1,-1}});
+
+// Fill the datasets with data.
+	
+IndexGenerator<2> index_generator({1, 1}, {127, 127});
+Computation<2> computation(data, index_generator);
+	
+computation.compute(
+    [] (NeighProxy<CellData<2>> x, double& y)
+    {
+        y = 
+           -x[{1,1}]  - x[{1,0}]   - x[{1,-1}]
+           -x[{0,1}]  + 8*x[{0,0}] - x[{0,-1}]
+           -x[{-1,1}] - x[{-1,0}]  - x[{-1,-1}];
+    },
+    NEIGH<CellData<2>>(x, s9pt),
+    OUT<CellData<2>>(y));
+\end{lstlisting}
+
+
+Once we allow cells that contain multiple materials, an additional set of
+algorithms becomes available. One of the most straightforward types is when the
+iteration is performed independently over all cell-material pairs (where the
+cell contains the material). An example is to calculate the mass of each
+material in each cell, given the density and fractional volume of each material
+in each cell and the volume of each cell. This can be computed by applying the
+following formula for every existing cell-material pair: $density \times
+material\_fractional\_volume \times cell\_volume$. In this computation,
+\textit{density} and \textit{material\_fractional\_volume} are defined by both
+cells and materials, therefore their type is \textit{CellMatData}, but the
+dataset \textit{cell\_volume} is only defined by cells, therefore its type is
+\textit{CellData}.
+
+Other types of possible computations include the following features: accessing
+values of the same material on adjacent cells (for example locally averaged
+density), reduction of values along all spatial dimensions (e.g. total mass of
+each material on the whole mesh) and reduction of values along the material
+dimension (e.g. total mass of materials in each cell).
+
+The following example demonstrates a multimaterial computation with similar to
+the one describe above, but with an additional step of reduction. The problem to
+be solved is the following: given a \textit{density} and a \textit{volume} state
+variable (both defined by both cells and materials), calculate the total mass of
+the materials in each cell. This involves summing the masses of the individual
+materials in each cell.
+
+\begin{lstlisting}[language=c++]
+const std::size_t COLS = 200;
+const std::size_t ROWS = 200;
+
+// Specify which materials are present in each cell.
+const std::vector<std::vector<std::size_t>> materials = ...;
+
+Data<2> data({COLS, ROWS}, materials);
+
+CellMatData<2> density = data.new_cell_mat_data();
+CellMatData<2> volume = data.new_cell_mat_data();
+
+// Fill the datasets with data.
+
+CellData<2> mass_by_cell = data.new_cell_data();
+
+auto sum = [] (double left, double right) {
+    return left + right;
+};
+
+IndexGenerator<2> index_generator({0, 0}, {COLS, ROWS});
+Computation<2> computation(data, index_generator);
+
+computation.compute(
+    [] (double density,
+        double volume,
+        ReduceProxy mass_by_cell)
+    {
+        mass_by_cell << density * volume;
+    },
+    IN<CellMatData<2>>(density),
+    IN<CellMatData<2>>(volume),
+    REDUCE<CellData<2>>(sum, mass_by_cell));
+\end{lstlisting}
+
+The next example illustrates how mesh-invariant datasets can be used.
+
+\begin{lstlisting}[language=c++]
+const std::size_t COLS = 128;
+
+// All cells are single-material and contain the same material.
+const std::vector<std::vector<std::size_t>> materials(1, 0);
+
+Data<1> data({COLS}, materials);
+
+const double dt = 1e-2;
+
+CellData<1> input = data.new_cell_data();
+CellData<1> output = data.new_cell_data();
+
+Stencil<1> neighs({{-1}, {0}, {1}});
+
+// Fill the dataset with data.
+
+IndexGenerator<1> index_generator({1}, {COLS - 1});
+Computation<1> computation(data, index_generator);
+
+computation.compute(
+    [] (const double dt,
+        const NeighProxy<CellData<1>> input,
+        double& output) {
+            output = dt * (
+                - input[{-1}]
+                + 2*input[{0}]
+                - input[{1}]
+                );
+	},
+	FREE_SCALAR<>(dt),
+	NEIGH<CellData<1>>(input, neighs),
+	OUT<CellData<1>>(output));
+\end{lstlisting}
+
+We conclude this chapter by showing an example of a multimaterial computation,
+taken from \cite{osti_1341844}, written by hand and using our framework. The
+computation calculates the average density of each material over a neighbourhood
+of cells, weighting them inversely proportionally to the square of their
+distance from the actual cell. The problem is defined on a two-dimensional mesh,
+so the number of neighbours including the actual cell is 9.
+
+The hand-written version, which uses OMP for parallelisation and the
+cell-centric compressed representation to store the data, is shown below:
+
+\lstinputlisting[language=c++]{handwritten_example.cpp}
+
+The version using our framework is shown below:
+
+\lstinputlisting[language=c++]{mm_example.cpp}
+
+The above examples clearly show that using our framework reduces the size of the
+code and makes it much easier to read. The user can concentrate on the
+scientific problem and leave the explicit handling of the loops and data access
+to the framework.
+
+\section{Measurements}
+
+In this section, we present some measurements that can be used to compare the
+efficiency of the full-matrix and the cell-centric compact representations in
+the case of hand-written code and using our framework.
+
+The measurements concerning our framework are only preliminary as the
+implementation of the code generation modules has only begun, and many
+optimisation possibilities are not exploited yet.
+
+The example problem on which the measurements were taken contains 1 million
+cells, 96\% of which contain one material, 3.9\% contain two materials, 0.06\%
+contain three materials and 0.04\% contain four materials.
+
+The code was compiled with the Intel Compiler, version 2018. The hardware was an
+Intel\textregistered\ Xeon\textregistered\ CPU E5-2660 v4 @ 2.00GHz, 14 cores, 2
+sockets (but only one was used). The operating system was Debian GNU/Linux 9.
+
+The test contains of three algorithms. The first algorithm computes the average
+density of the cells, the second one updates the state of each material and the
+third one computes the average density of each material over a neighbourhood of
+cells.
+
+\autoref{tab:handwritten} shows the results for the hand-written and optimised
+code. The version using OpenMP was compiled with the following options:
+\texttt{KMP\_AFFINITY=compact OMP\_NUM\_THREADS=28 numactl --cpunodebind=0}.
+
+\begin{table}[h]
+\begin{tabular}{|l|l|l|}
+\hline
+\multicolumn{1}{|c|}{\textbf{Hand-written and optimised (seconds)}} & \multicolumn{1}{c|}{Single-threaded} & \multicolumn{1}{c|}{OpenMP} \\ \hline
+Material centric full matrix, alg 1                      & 0.0742979                            & 0.0114698                   \\ \hline
+Material centric full matrix, alg 2                      & 0.063545                             & 0.0176821                   \\ \hline
+Material centric full matrix, alg 3                      & 0.081099                             & 0.020175                    \\ \hline
+Cell centric compact matrix, alg 1                       & 0.00658894                           & 0.00691891                  \\ \hline
+Cell centric compact matrix, alg 2                       & 0.00280404                           & 0.000621796                 \\ \hline
+Cell centric compact matrix, alg 3                       & 0.013417                             & 0.00448918                  \\ \hline
+\end{tabular}
+\caption {Handwritten and optimised measurements}
+\label{tab:handwritten}
+\end{table}
+
+The results clearly show that parallelisation significantly reduces the running
+time of almost all algorithms, the only exception being algorithm 1 with compact
+cell-centric representation.
+
+\autoref{tab:MM} shows the results of the tests using our framework. At present,
+only single-threaded mode is available and code generation only works with
+full-matrix representation.
+
+\begin{table}[]
+\begin{tabular}{|l|l|l|}
+\hline
+\multicolumn{1}{|c|}{\textbf{\begin{tabular}[c]{@{}c@{}}MM framework, single-threaded\\  (seconds)\end{tabular}}} & \multicolumn{1}{c|}{No code generation} & \multicolumn{1}{c|}{Code generation} \\ \hline
+Cell centric full matrix, alg 1                                                                                   & 1.27382                                 & 0.0760949                            \\ \hline
+Cell centric full matrix, alg 2                                                                                   & 1.499                                   & 0.0930922                            \\ \hline
+Cell centric full matrix, alg 3                                                                                   & 34.9193                                 & 0.571133                             \\ \hline
+Cell centric compact matrix, alg 1                                                                                & 0.0253029                               &                                      \\ \hline
+Cell centric compact matrix, alg 2                                                                                & 0.023159                                &                                      \\ \hline
+Cell centric compact matrix, alg 3                                                                                & 1.84389                                 &                                      \\ \hline
+\end{tabular}
+\caption {MM framework measurements}
+\label{tab:MM}
+\end{table}
+
+The results show that the although at the present state of the implementation,
+the hand-written code performs much better than our framework, the code
+generation algorithm has a huge effect on the efficiency of the resulting
+code. Another thing to note is the poor performance in case of algorithm 3,
+which involves neighbour access. This is due to the fact that when accessing
+neighbours, the existence of the neighbour is always checked, although this is
+not necessary and the hand-written version does not perform these unnecessary
+checks.
+
+\chapter{Future work}
+
+Although the abstract interface of our proposed framework is more or less
+stable, we have plans of adding new features in the future and the greatest part
+of the implementation is yet to be finished. This section gives an overview of
+some of the most important additions and extensions we plan to implement,
+
+Support for code generation, one of the cornerstones of the framework, is under
+development. Code generation gives much more freedom to manipulate the result of
+the compilation process than templates. Although the template sublanguage of C++
+is Turing-complete and therefore theoretically capable of performing any
+computation or algorithm that is possible to compute using any existing device,
+the extent to which templates can be used conveniently is limited. The template
+sublanguage differs from the core C++ language, which can possibly make reading
+template-heavy C++ code more difficult to read. The error messages that
+compilers generate upon finding problems in template code tend to be very
+verbose and convoluted, requiring much more effort to understand than error
+messages concerning non-template code. This makes writing and maintaining
+template-heavy code a significantly more challenging task. With explicit code
+generation, all of these problems can be addressed. Although the developers of
+the code generation modules have to take care of handling these challenges
+themselves, much better results can be achieved both in terms of convenience of
+development and in terms of the performance of the resulting executable that is
+compiled from the abstraction.
+
+Our long-term goal is using the \textit{clang} compiler front-end for code
+generation. \textit{Clang} is an open-source language front-end and
+infrastructure tooling library for C-like languages such as C, C++, Objective C
+and CUDA. As an example, it can be used to parse C++ code into an abstract
+syntax tree. As parsing C++ is notoriously difficult because of the complexity
+and context dependence of the syntax, using a tool that is well-tested and has
+been used by thousands of developers is a good decision in our opinion. However,
+the first implementation of code generation is developed in python to allow for
+more rapid experimentation.
+
+One of the main goals of the framework is to provide a common interface to
+multiple hardware architectures. At the present time, the pure C++
+implementation and the code generation module under development both target the
+CPU, with the C++ implementation even being single-threaded, although the code
+generation module does make use of parallelisation frameworks such as
+OpenMP. The next step will be adding support for Nvidia GPUs through the CUDA
+interface.
+
+Currently our abstraction only supports structured meshes, but as unstructured
+meshes also form an important category of computations, we are planning to
+integrate them into the framework.
+
+As we have stated above, reductions are only allowed either along all spatial
+dimensions at the same time or along the material dimension. Support for
+reductions along individual spatial dimensions may be introduced in the future.
+
+At present, the mesh needs to be defined statically before the computations, and
+it is not possible to alter its structure after its creation. We are planning to
+add support for advection, i. e. the movement of materials across the cells. In
+case of single-material computations, it is relatively straightforward, but
+multimaterial meshes present the additional difficulty that the number of
+materials in a cell can change as a result of the movement, which can be
+difficult to handle in the case of some data structures.
+
+\chapter{Conclusion}
+
+The concept of active libraries, frameworks that look like traditional
+programming libraries but employ some form of modification in the compilation
+process, most commonly code generation, to tailor the resulting program to the
+specific characteristics of the target hardware architecture, have been used
+successfully in the past in frameworks such as OPS and OP2 described earlier in
+this work, where they are a key factor in achieving near-optimal run-time
+performance. This has led us to choose the same strategy in our framework and
+adopt the active library method.
+
+The abstract interface of our framework was designed with parallelisation and
+code generation in mind, where information that can help the code generator or
+even traditional compilers to optimise and efficiently parallelise the resulting
+code is made explicit by the framework, and therefore easily accessible by
+compilation or code generation tools.
+
+The advantages of abstracting away parallelisation together with the use and
+possibly also the choice of data structures can clearly be seen even at this
+early stage of the implementation of our framework. This makes it easier for
+scientists who are not experts at computer science and parallel computations to
+write domain-specific scientific code. The readability of the code base also
+increases as implementation details that are not important for the understanding
+of the algorithm are hidden behind the abstraction.
+
+The development of the framework is still in its early stages, therefore a huge
+amount of work remains to be done. The implementation of efficient code
+generation is vital for the usability of the abstraction, as is the support for
+different parallel hardware architectures, most notably GPUs. As we progress
+with the development of the framework, we shall seek to find ways to gradually
+migrate existing code bases to our framework, and finally, to integrate the
+abstraction into OPS and OP2.
+
+The code for the framework is available at \url{https://github.com/d-becker/MM}.
+
+\printbibliography
+
+%% \appendix
+%% \chapter{List of appendices}
+
+\end{document}
