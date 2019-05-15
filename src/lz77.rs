@@ -53,7 +53,6 @@ pub fn lz77_encode_to_blocks(bytes: &[u8], distance_bits: usize, length_bits: us
         let buffer_start = if index <= readback_size {
             0
         } else {
-            // index - distance_bits
             index - readback_size
         };
 

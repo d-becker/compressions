@@ -23,21 +23,6 @@ const DISTANCE_BITS: usize = 12;
 const LENGTH_BITS: usize = 4;
 
 fn main() -> std::io::Result<()> {
-    // let args: Vec<String> = std::env::args().collect();
-
-    // if args.len() < 3 {
-    //     print_usage();
-    //     std::process::exit(1);
-    // }
-
-    // let decompress = args[1] == "-d";
-    // let delta_encode = true;
-
-    // if decompress && args.len() < 4 {
-    //     print_usage();
-    //     std::process::exit(1);
-    // }
-
     let mut decompress = false;
     let mut delta_coding = false;
     let mut input_name = String::new();

@@ -11,6 +11,7 @@ impl BitPacker {
         BitPacker {data: Vec::new(), bit_offset: 0, buffer: 0}
     }
 
+    /// Pack elements in an internal buffer. Use `get_bytes` to get all the packed integers.
     #[must_use]
     pub fn pack(&mut self, value: u64, bit_width: usize) -> Option<()> {
         let significant_bits = std::mem::size_of::<u64>() * 8 - value.leading_zeros() as usize;
@@ -60,6 +61,7 @@ impl<'a> BitUnpacker<'a> {
         BitUnpacker {data, byte_offset: 0, bit_offset: 0}
     }
 
+    /// Unpack elements one by one.
     pub fn unpack(&mut self, bit_width: usize) -> Option<u64> {
         if bit_width > 64 {
             return None;
